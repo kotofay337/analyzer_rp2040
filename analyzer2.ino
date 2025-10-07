@@ -157,10 +157,10 @@ void runDisplay() {
             uint16_t idx = NUM_LEDS - (c * LEVELS + LEVELS - l);
             
             if (l <= v_array[c]) {
-                matrix.setPixelColor(idx, matrix.Color(0, 1, 1));
+                matrix.setPixelColor(idx, matrix.Color(0, 2, 2));
             }
             if (l == v_array_max[c]) {
-                matrix.setPixelColor(idx, matrix.Color(1, 0, 0));
+                matrix.setPixelColor(idx, matrix.Color(7, 0, 0));
             }
         }
     }
