@@ -1,4 +1,6 @@
-//#define PRINTDATA true
+#define USE_PWR_LDO_SUPPLY
+
+//#define PRINTDATA false
 // преобразование Фурье на C (для Raspberry Pi Pico W)
 #define FHT_N 1024
 #define FFT_SIZE FHT_N
@@ -71,7 +73,7 @@ void FFT(int* AVal, int* FTvl) {
 #define LED_PIN 11
 
 #define SMOOTH_UP 1.0f
-#define SMOOTH_DOWN 0.35f
+#define SMOOTH_DOWN 0.45f
 #define BLOCKS 5
 #define LEVELS 8
 #define COLUMNS (BLOCKS*8)
@@ -99,7 +101,7 @@ uint8_t v_array[COLUMNS];
 float v_array_old[COLUMNS];
 
 #define FALL_DELAY 30
-#define FALL_PAUSE 400
+#define FALL_PAUSE 250
 unsigned long timeMaxLevel[COLUMNS];
 bool fallFlag;
 unsigned long fallTimer;
@@ -107,6 +109,7 @@ unsigned long fallTimer;
 int band_start[COLUMNS];
 int band_end[COLUMNS];
 float band_compensation[COLUMNS];
+int idxLOW = 19, idxMID = 30;
 
 // Флаги для синхронизации между ядрами
 volatile bool data_ready = false;
@@ -135,6 +138,10 @@ void setupFrequencyBands() {
         band_end[band] = constrain(band_end[band], band_start[band] + 1, FFT_SIZE/2);
         
         float center_freq = sqrtf(low_freq * high_freq);
+        if( center_freq <= 1400 )
+           idxLOW = band;
+        else if( center_freq <= 7000 )
+           idxMID = band;
         
         //if (center_freq < 900.0f) {
         //    band_compensation[band] = 1.0f;
@@ -160,7 +167,14 @@ void runDisplay() {
                 matrix.setPixelColor(idx, matrix.Color(0, 2, 2));
             }
             if (l == v_array_max[c]) {
-                matrix.setPixelColor(idx, matrix.Color(7, 0, 0));
+               uint32_t color = matrix.Color(4, 0, 0);
+               if( c <= idxLOW )
+                  color = matrix.Color(4, 0, 0);//System.out.println( "band : " + c + ", color = RED");
+               else if( c <= idxMID )
+                  color = matrix.Color(0, 4, 0);//System.out.println( "band : " + c + ", color = GREEN");
+               else if( c > idxMID )
+                  color = matrix.Color(0, 0, 4);//System.out.println( "band : " + c + ", color = BLUE");
+                matrix.setPixelColor(idx, color);
             }
         }
     }
@@ -168,6 +182,7 @@ void runDisplay() {
 }
 
 void runPrepareArray() {
+    
 #ifdef PRINTDATA
     Serial.print("db data :  ");
 #endif        
@@ -246,6 +261,8 @@ void setup() {
     while (!Serial) delay(10);
 #endif
 
+   pinMode(LED_BUILTIN, OUTPUT);
+
     analogReadResolution(12);
     
     matrix.begin();
@@ -272,7 +289,9 @@ void loop() {
     
     // Сигнализируем второму ядру, что данные готовы
     data_ready = true;
-    
+
+    digitalWrite(LED_BUILTIN, HIGH);  // turn the LED on (HIGH is the voltage level)
+
     // Ждем завершения обработки на втором ядре
     while (!processing_done) {
         delayMicroseconds(2);
@@ -281,7 +300,9 @@ void loop() {
     time = micros();
     runPrepareArray();
     tPrepare = micros() - time;
-    
+
+    digitalWrite(LED_BUILTIN, LOW);   // turn the LED off by making the voltage LOW
+
     time = micros();
     runDisplay();
     tDisplay = micros() - time;
